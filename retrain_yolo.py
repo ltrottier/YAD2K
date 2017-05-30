@@ -18,6 +18,10 @@ from yad2k.models.keras_yolo import (preprocess_true_boxes, yolo_body,
                                      yolo_eval, yolo_head, yolo_loss)
 from yad2k.utils.draw_boxes import draw_boxes
 
+config = K.tf.ConfigProto()
+config.gpu_options.allow_growth=True
+K.set_session(K.tf.Session(config=config))
+
 # Args
 argparser = argparse.ArgumentParser(
     description="Retrain or 'fine-tune' a pretrained YOLOv2 model for your own data.")
