@@ -44,6 +44,12 @@ argparser.add_argument(
     help='path to classes file, defaults to pascal_classes.txt',
     default=os.path.join('..', 'DATA', 'underwater_classes.txt'))
 
+argparser.add_argument(
+    '-s',
+    '--save_path',
+    help='path where to save the retrained model',
+    default="results")
+
 # Default anchor boxes
 YOLO_ANCHORS = np.array(
     ((0.57273, 0.677385), (1.87446, 2.06253), (3.33843, 5.47434),
@@ -53,6 +59,8 @@ def _main(args):
     data_path = os.path.expanduser(args.data_path)
     classes_path = os.path.expanduser(args.classes_path)
     anchors_path = os.path.expanduser(args.anchors_path)
+    save_path = os.path.expanduser(args.save_path)
+    os.makedirs(save_path, exist_ok=True)
 
     class_names = get_classes(classes_path)
     anchors = get_anchors(anchors_path)
@@ -76,7 +84,8 @@ def _main(args):
         image_data,
         boxes,
         detectors_mask,
-        matching_true_boxes
+        matching_true_boxes,
+        save_path
     )
 
     draw(model_body,
@@ -85,6 +94,7 @@ def _main(args):
         image_data,
         image_set='val', # assumes training/validation split is 0.9
         weights_name='trained_stage_3_best.h5',
+        out_path=os.path.join(save_path, "output_images"),
         save_all=False)
 
 
@@ -231,7 +241,8 @@ def create_model(anchors, class_names, load_pretrained=True, freeze_body=True):
 
     return model_body, model
 
-def train(model, class_names, anchors, image_data, boxes, detectors_mask, matching_true_boxes, validation_split=0.1):
+def train(model, class_names, anchors, image_data, boxes, detectors_mask, 
+        matching_true_boxes, save_path, validation_split=0.1):
     '''
     retrain/fine-tune the model
 
@@ -248,8 +259,11 @@ def train(model, class_names, anchors, image_data, boxes, detectors_mask, matchi
 
 
     logging = TensorBoard()
-    checkpoint = ModelCheckpoint("trained_stage_3_best.h5", monitor='val_loss',
-                                 save_weights_only=True, save_best_only=True)
+    checkpoint = ModelCheckpoint(
+        os.path.join(save_path, "trained_stage_3_best.h5"), 
+        monitor='val_loss',
+        save_weights_only=True,
+        save_best_only=True)
     early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=15, verbose=1, mode='auto')
 
     model.fit([image_data, boxes, detectors_mask, matching_true_boxes],
@@ -258,11 +272,11 @@ def train(model, class_names, anchors, image_data, boxes, detectors_mask, matchi
               batch_size=32,
               epochs=5,
               callbacks=[logging])
-    model.save_weights('trained_stage_1.h5')
+    model.save_weights(os.path.join(save_path, 'trained_stage_1.h5'))
 
     model_body, model = create_model(anchors, class_names, load_pretrained=False, freeze_body=False)
 
-    model.load_weights('trained_stage_1.h5')
+    model.load_weights(os.path.join(save_path, 'trained_stage_1.h5'))
 
     model.compile(
         optimizer='adam', loss={
@@ -277,7 +291,7 @@ def train(model, class_names, anchors, image_data, boxes, detectors_mask, matchi
               epochs=30,
               callbacks=[logging])
 
-    model.save_weights('trained_stage_2.h5')
+    model.save_weights(os.path.join(save_path, 'trained_stage_2.h5'))
 
     model.fit([image_data, boxes, detectors_mask, matching_true_boxes],
               np.zeros(len(image_data)),
@@ -286,7 +300,7 @@ def train(model, class_names, anchors, image_data, boxes, detectors_mask, matchi
               epochs=30,
               callbacks=[logging, checkpoint, early_stopping])
 
-    model.save_weights('trained_stage_3.h5')
+    model.save_weights(os.path.join(save_path, 'trained_stage_3.h5'))
 
 def draw(model_body, class_names, anchors, image_data, image_set='val',
             weights_name='trained_stage_3_best.h5', out_path="output_images", save_all=True):
