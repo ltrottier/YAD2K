@@ -93,7 +93,7 @@ def _main(args):
         anchors,
         image_data,
         image_set='val', # assumes training/validation split is 0.9
-        weights_name='trained_stage_3_best.h5',
+        weights_name=os.path.join(save_path, 'trained_stage_3_best.h5'),
         out_path=os.path.join(save_path, "output_images"),
         save_all=False)
 
